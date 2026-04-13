@@ -39,27 +39,25 @@ function App() {
             </div>
           </div>
 
-          {/* Gauge */}
-          <SpeedGauge
-            downloadMbps={state.downloadMbps}
-            uploadMbps={state.uploadMbps}
-            phase={state.phase}
-            progress={state.progress}
-          />
-
-          {/* Button — AGAIN re-runs the test */}
-          <div style={{ marginTop: 16 }}>
-            <TestControls
+          {/* Gauge — positioned higher when test is done to make room for stats */}
+          <div style={{ marginTop: done ? "-40px" : "0", transition: "margin 0.3s ease" }}>
+            <SpeedGauge
+              downloadMbps={state.downloadMbps}
+              uploadMbps={state.uploadMbps}
               phase={state.phase}
-              onStart={startTest}
-              onAgain={startTest}
+              progress={state.progress}
             />
           </div>
 
-          {/* Big stats on left panel when done */}
+          {/* Button — AGAIN re-runs the test */}
+          <div style={{ marginTop: 12 }}>
+            <TestControls phase={state.phase} onStart={startTest} onAgain={startTest} />
+          </div>
+
+          {/* Big stats at bottom of left panel */}
           {done && (
             <div style={{
-              position: "absolute", bottom: 16, left: 16, right: 16,
+              position: "absolute", bottom: 14, left: 14, right: 14,
               display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8,
             }}>
               {[
@@ -67,12 +65,12 @@ function App() {
                 { label: "Upload", val: formatSpeed(state.uploadMbps), color: "var(--purple)" },
                 { label: "Ping", val: { value: state.unloadedLatency.toFixed(1), unit: "ms" }, color: "var(--green)" },
               ].map((s) => (
-                <div key={s.label} className="glass-flat" style={{ padding: "10px 12px", textAlign: "center" as const }}>
-                  <p className="label" style={{ marginBottom: 4 }}>{s.label}</p>
-                  <p style={{ fontSize: "1.1rem", fontWeight: 700, color: s.color, fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>
+                <div key={s.label} className="glass" style={{ padding: "10px 8px", textAlign: "center" as const }}>
+                  <p className="label" style={{ marginBottom: 3, fontSize: "0.5rem" }}>{s.label}</p>
+                  <p style={{ fontSize: "1.15rem", fontWeight: 700, color: s.color, fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>
                     {s.val.value}
                   </p>
-                  <p style={{ fontSize: "0.48rem", color: "var(--text-3)", marginTop: 2 }}>{s.val.unit}</p>
+                  <p style={{ fontSize: "0.45rem", color: "var(--text-3)", marginTop: 2 }}>{s.val.unit}</p>
                 </div>
               ))}
             </div>
@@ -81,16 +79,22 @@ function App() {
 
         {/* ── RIGHT PANEL (60%) ── */}
         <div className="panel-right">
-          {/* Server info */}
+          {/* Connection info bar */}
           {clientInfo && (
             <div className="glass-flat" style={{
               padding: "10px 16px",
               display: "flex", flexWrap: "wrap" as const,
               gap: "4px 14px", fontSize: "0.62rem", color: "var(--text-3)", lineHeight: 2,
             }}>
+              {/* Client city — always show if available */}
               {clientInfo.city !== "—" && (
                 <span><strong style={{ color: "var(--text-2)" }}>Client</strong> {clientInfo.city}, {clientInfo.country}</span>
               )}
+              {/* Fallback: show country from Cloudflare trace if no city */}
+              {clientInfo.city === "—" && clientInfo.country !== "—" && (
+                <span><strong style={{ color: "var(--text-2)" }}>Client</strong> {clientInfo.country}</span>
+              )}
+              {/* IP */}
               {clientInfo.ip !== "—" && (
                 <span style={{
                   fontSize: "0.56rem", padding: "1px 6px",
@@ -99,11 +103,15 @@ function App() {
                   fontVariantNumeric: "tabular-nums",
                 }}>{clientInfo.ip}</span>
               )}
+              {/* ISP */}
               {clientInfo.isp !== "—" && (
                 <span><strong style={{ color: "var(--text-2)" }}>ISP</strong> {clientInfo.isp}</span>
               )}
+              {/* Server — from Cloudflare edge */}
               {clientInfo.colo !== "—" && (
-                <span><strong style={{ color: "var(--text-2)" }}>Server</strong> {clientInfo.coloCity} ({clientInfo.colo})</span>
+                <span>
+                  <strong style={{ color: "var(--text-2)" }}>Server</strong> {clientInfo.coloCity} ({clientInfo.colo})
+                </span>
               )}
             </div>
           )}
