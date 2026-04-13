@@ -5,20 +5,11 @@ type Props = {
   uploadMbps: number;
   phase: TestPhase;
   progress: number;
-  isRunning: boolean;
 };
 
-const R = 110;
+const R = 105;
 const STROKE = 6;
 const C = 2 * Math.PI * R;
-
-function phaseLabel(p: TestPhase) {
-  if (p === "idle") return "Ready to test";
-  if (p === "ping") return "Measuring latency...";
-  if (p === "download") return "Testing download";
-  if (p === "upload") return "Testing upload";
-  return "Test complete";
-}
 
 function activeSpeed(p: TestPhase, dl: number, ul: number) {
   if (p === "download") return dl;
@@ -27,102 +18,90 @@ function activeSpeed(p: TestPhase, dl: number, ul: number) {
   return 0;
 }
 
-export default function SpeedGauge({ downloadMbps, uploadMbps, phase, progress, isRunning }: Props) {
+export default function SpeedGauge({ downloadMbps, uploadMbps, phase, progress }: Props) {
   const speed = activeSpeed(phase, downloadMbps, uploadMbps);
   const fmt = formatSpeed(speed);
   const offset = C * (1 - Math.min(progress, 1));
-  const showSpeed = phase !== "idle" && phase !== "ping";
+  const showSpeed = (phase === "download" || phase === "upload" || phase === "done") && speed > 0;
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "16px" }}>
-      {/* Phase label */}
-      <p style={{
-        fontSize: "0.72rem",
-        fontWeight: 500,
-        color: "var(--text-muted)",
-        letterSpacing: "0.05em",
-      }}>
-        {phaseLabel(phase)}
-      </p>
-
-      {/* Ring + speed */}
-      <div style={{ position: "relative", width: 260, height: 260, display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <svg viewBox="0 0 260 260" style={{ position: "absolute", inset: 0, transform: "rotate(-90deg)" }}>
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, width: "100%" }}>
+      {/* Ring */}
+      <div style={{ position: "relative", width: 250, height: 250, display: "flex", alignItems: "center", justifyContent: "center" }}>
+        <svg viewBox="0 0 250 250" style={{ position: "absolute", inset: 0, transform: "rotate(-90deg)" }}>
           <defs>
             <linearGradient id="rg" x1="0%" y1="0%" x2="100%" y2="100%">
               <stop offset="0%" stopColor="#0ea5e9" />
               <stop offset="100%" stopColor="#8b5cf6" />
             </linearGradient>
           </defs>
-          {/* Background track */}
-          <circle cx="130" cy="130" r={R} fill="none" stroke="#e8eaef" strokeWidth={STROKE} />
-          {/* Progress */}
+          <circle cx="125" cy="125" r={R} fill="none" stroke="var(--border-light)" strokeWidth={STROKE} />
           <circle
-            cx="130" cy="130" r={R} fill="none"
+            cx="125" cy="125" r={R} fill="none"
             stroke="url(#rg)" strokeWidth={STROKE} strokeLinecap="round"
-            strokeDasharray={C}
-            strokeDashoffset={offset}
+            strokeDasharray={C} strokeDashoffset={offset}
             style={{ transition: "stroke-dashoffset 0.3s ease-out" }}
           />
         </svg>
 
-        {/* Center content */}
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", position: "relative" }}>
           {phase === "ping" ? (
-            <div style={{
-              width: 28, height: 28,
-              border: "3px solid #e8eaef",
-              borderTopColor: "var(--cyan)",
-              borderRadius: "50%",
-              animation: "spin 0.8s linear infinite",
-            }} />
-          ) : (
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+              <div style={{
+                width: 24, height: 24,
+                border: "2.5px solid var(--border)",
+                borderTopColor: "var(--cyan)",
+                borderRadius: "50%",
+                animation: "spin 0.7s linear infinite",
+              }} />
+              <span style={{ fontSize: "0.62rem", color: "var(--text-3)", letterSpacing: "0.12em", textTransform: "uppercase" as const }}>
+                Pinging
+              </span>
+            </div>
+          ) : showSpeed ? (
             <>
               <span style={{
-                fontSize: showSpeed ? "clamp(2.8rem, 8vw, 4.5rem)" : "2.5rem",
-                fontWeight: 700,
-                color: "var(--text)",
-                lineHeight: 1,
+                fontSize: "clamp(2.5rem, 7vw, 4rem)",
+                fontWeight: 700, color: "var(--text)",
+                lineHeight: 1, letterSpacing: "-0.03em",
                 fontVariantNumeric: "tabular-nums",
-                letterSpacing: "-0.03em",
               }}>
-                {showSpeed && speed > 0 ? fmt.value : ""}
+                {fmt.value}
               </span>
-              <span style={{
-                fontSize: "0.85rem",
-                fontWeight: 500,
-                color: "var(--text-muted)",
-                letterSpacing: "0.1em",
-                textTransform: "uppercase" as const,
-                marginTop: "4px",
-              }}>
-                {showSpeed && speed > 0 ? fmt.unit : "Mbps"}
+              <span style={{ fontSize: "0.8rem", color: "var(--text-3)", letterSpacing: "0.08em", textTransform: "uppercase" as const, marginTop: 2 }}>
+                {fmt.unit}
               </span>
             </>
+          ) : (
+            <span style={{ fontSize: "0.8rem", color: "var(--text-3)", letterSpacing: "0.08em", textTransform: "uppercase" as const }}>
+              Mbps
+            </span>
           )}
         </div>
       </div>
 
-      {/* Progress steps */}
-      {(isRunning || phase === "done") && (
-        <div style={{ display: "flex", gap: "4px" }}>
+      {/* Phase label */}
+      <p style={{ fontSize: "0.68rem", color: "var(--text-3)", letterSpacing: "0.04em" }}>
+        {phase === "idle" ? "Ready to test" : phase === "ping" ? "Measuring latency..." : phase === "download" ? "Testing download" : phase === "upload" ? "Testing upload" : "Test complete"}
+      </p>
+
+      {/* Step dots */}
+      {phase !== "idle" && (
+        <div style={{ display: "flex", gap: 4 }}>
           {(["ping", "download", "upload"] as const).map((p) => {
             const done = phase === "done" || (phase === "download" && p === "ping") || (phase === "upload" && (p === "ping" || p === "download"));
             const active = phase === p;
             return (
               <div key={p} style={{
-                width: done ? 24 : active ? 24 : 6,
-                height: 3,
-                borderRadius: 2,
-                background: done ? "var(--cyan)" : active ? "rgba(14,165,233,0.4)" : "var(--border)",
-                transition: "all 0.4s ease",
+                width: done ? 20 : active ? 20 : 5,
+                height: 3, borderRadius: 2,
+                background: done ? "var(--cyan)" : active ? "rgba(14,165,233,0.35)" : "var(--border)",
+                transition: "all 0.3s ease",
               }} />
             );
           })}
         </div>
       )}
-
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }
