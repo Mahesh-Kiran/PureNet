@@ -56,7 +56,7 @@ export function getConnectionLabel(mbps: number): string {
 async function fetchClientInfo(): Promise<ClientInfo> {
   const info: ClientInfo = { ip: "—", city: "—", region: "—", country: "—", isp: "—", colo: "—", coloCity: "—" };
   try {
-    const r = await fetch("/cf-trace", { cache: "no-store" });
+    const r = await fetch("https://cloudflare.com/cdn-cgi/trace", { cache: "no-store" });
     const txt = await r.text();
     const m: Record<string, string> = {};
     txt.split("\n").forEach((l) => { const [k, v] = l.split("="); if (k && v) m[k.trim()] = v.trim(); });
@@ -80,7 +80,7 @@ async function fetchClientInfo(): Promise<ClientInfo> {
 }
 
 async function measurePing(samples = 15): Promise<{ pingMs: number; jitterMs: number }> {
-  const url = "/cf-trace";
+  const url = "https://cloudflare.com/cdn-cgi/trace";
   const times: number[] = [];
   for (let i = 0; i < 3; i++) await fetch(`${url}?_t=${Math.random()}`, { cache: "no-store", mode: "no-cors" }).catch(() => {});
   for (let i = 0; i < samples; i++) {
@@ -99,7 +99,7 @@ async function measurePing(samples = 15): Promise<{ pingMs: number; jitterMs: nu
 
 async function pingOnce(): Promise<number> {
   const t0 = performance.now();
-  await fetch(`/cf-trace?_t=${Math.random()}`, { cache: "no-store", mode: "no-cors" });
+  await fetch(`https://cloudflare.com/cdn-cgi/trace?_t=${Math.random()}`, { cache: "no-store", mode: "no-cors" });
   return performance.now() - t0;
 }
 
@@ -109,7 +109,7 @@ async function runDownload(
   onLatency: (ms: number) => void,
 ): Promise<number> {
   const pt0 = performance.now();
-  const pr = await fetch(`/cf-speed/__down?bytes=1048576&_t=${Math.random()}`, { cache: "no-store" });
+  const pr = await fetch(`https://speed.cloudflare.com/__down?bytes=1048576&_t=${Math.random()}`, { cache: "no-store" });
   const pb = await pr.blob();
   const probeMbps = (pb.size * 8) / ((performance.now() - pt0) / 1000) / 1e6;
 
@@ -133,7 +133,7 @@ async function runDownload(
   const latTimer = setInterval(async () => { try { onLatency(await pingOnce()); } catch {} }, 1500);
 
   const streams = Array.from({ length: streamCount }, async () => {
-    const res = await fetch(`/cf-speed/__down?bytes=${bytesPerStream}&_t=${Math.random()}`, { cache: "no-store" });
+    const res = await fetch(`https://speed.cloudflare.com/__down?bytes=${bytesPerStream}&_t=${Math.random()}`, { cache: "no-store", headers: { "Accept-Encoding": "identity" } });
     if (!res.body) return;
     const reader = res.body.getReader();
     while (true) {
@@ -180,7 +180,7 @@ async function runUpload(
 ): Promise<number> {
   const probeBuf = new Uint8Array(1024 * 1024);
   const pt0 = performance.now();
-  await fetch("/cf-speed/__up", { method: "POST", body: probeBuf });
+  await fetch("https://speed.cloudflare.com/__up", { method: "POST", body: probeBuf });
   const probeMbps = (probeBuf.length * 8) / ((performance.now() - pt0) / 1000) / 1e6;
 
   let uploadBytes: number;
@@ -200,7 +200,7 @@ async function runUpload(
 
   return new Promise<number>((resolve) => {
     const xhr = new XMLHttpRequest();
-    xhr.open("POST", "/cf-speed/__up");
+    xhr.open("POST", "https://speed.cloudflare.com/__up");
     let lastT = start, lastB = 0;
     const speeds: number[] = [];
 
