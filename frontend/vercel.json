@@ -1,0 +1,16 @@
+{
+  "rewrites": [
+    {
+      "source": "/cf-speed/:match*",
+      "destination": "https://speed.cloudflare.com/:match*"
+    },
+    {
+      "source": "/cf-trace",
+      "destination": "https://cloudflare.com/cdn-cgi/trace"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
