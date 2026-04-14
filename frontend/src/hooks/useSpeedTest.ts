@@ -80,12 +80,12 @@ async function fetchClientInfo(): Promise<ClientInfo> {
 }
 
 async function measurePing(samples = 15): Promise<{ pingMs: number; jitterMs: number }> {
-  const url = "https://cloudflare.com/cdn-cgi/trace";
+  const url = "/cf-trace";
   const times: number[] = [];
-  for (let i = 0; i < 3; i++) await fetch(url, { cache: "no-store", mode: "no-cors" }).catch(() => {});
+  for (let i = 0; i < 3; i++) await fetch(`${url}?_t=${Math.random()}`, { cache: "no-store", mode: "no-cors" }).catch(() => {});
   for (let i = 0; i < samples; i++) {
     const t0 = performance.now();
-    await fetch(url, { cache: "no-store", mode: "no-cors" });
+    await fetch(`${url}?_t=${Math.random()}`, { cache: "no-store", mode: "no-cors" });
     times.push(performance.now() - t0);
   }
   const sorted = [...times].sort((a, b) => a - b);
@@ -99,7 +99,7 @@ async function measurePing(samples = 15): Promise<{ pingMs: number; jitterMs: nu
 
 async function pingOnce(): Promise<number> {
   const t0 = performance.now();
-  await fetch("https://cloudflare.com/cdn-cgi/trace", { cache: "no-store", mode: "no-cors" });
+  await fetch(`/cf-trace?_t=${Math.random()}`, { cache: "no-store", mode: "no-cors" });
   return performance.now() - t0;
 }
 
@@ -109,7 +109,7 @@ async function runDownload(
   onLatency: (ms: number) => void,
 ): Promise<number> {
   const pt0 = performance.now();
-  const pr = await fetch(`/cf-speed/__down?bytes=1048576`, { cache: "no-store" });
+  const pr = await fetch(`/cf-speed/__down?bytes=1048576&_t=${Math.random()}`, { cache: "no-store" });
   const pb = await pr.blob();
   const probeMbps = (pb.size * 8) / ((performance.now() - pt0) / 1000) / 1e6;
 
@@ -133,7 +133,7 @@ async function runDownload(
   const latTimer = setInterval(async () => { try { onLatency(await pingOnce()); } catch {} }, 1500);
 
   const streams = Array.from({ length: streamCount }, async () => {
-    const res = await fetch(`/cf-speed/__down?bytes=${bytesPerStream}`, { cache: "no-store" });
+    const res = await fetch(`/cf-speed/__down?bytes=${bytesPerStream}&_t=${Math.random()}`, { cache: "no-store" });
     if (!res.body) return;
     const reader = res.body.getReader();
     while (true) {
