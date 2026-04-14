@@ -66,12 +66,15 @@ async function fetchClientInfo(): Promise<ClientInfo> {
     info.coloCity = COLO[info.colo] || info.colo;
   } catch {}
   try {
-    const r = await fetch("https://ipapi.co/json/", { cache: "no-store" });
-    const d = await r.json();
-    if (d.city) info.city = d.city;
-    if (d.region) info.region = d.region;
-    if (d.country_name) info.country = d.country_name;
-    if (d.org) info.isp = d.org;
+    const r = await fetch("https://get.geojs.io/v1/ip/geo.json", { cache: "no-store" });
+    if (r.ok) {
+      const d = await r.json();
+      if (d.city) info.city = d.city;
+      if (d.region) info.region = d.region;
+      if (d.country) info.country = d.country;
+      if (d.organization_name) info.isp = d.organization_name;
+      else if (d.organization) info.isp = d.organization.replace(/^AS\d+\s/, "");
+    }
   } catch {}
   return info;
 }

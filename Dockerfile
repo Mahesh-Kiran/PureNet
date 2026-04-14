@@ -3,7 +3,7 @@ WORKDIR /app
 
 FROM base AS frontend-deps
 COPY frontend/package*.json ./frontend/
-RUN cd frontend && npm ci
+RUN cd frontend && npm install
 
 FROM frontend-deps AS frontend-build
 COPY frontend/ ./frontend/
@@ -11,7 +11,7 @@ RUN cd frontend && npm run build
 
 FROM base AS backend-deps
 COPY backend/package*.json ./backend/
-RUN cd backend && npm ci
+RUN cd backend && npm install
 
 FROM backend-deps AS backend-build
 COPY backend/ ./backend/
@@ -23,7 +23,7 @@ ENV NODE_ENV=production
 ENV PORT=3000
 
 COPY backend/package*.json ./
-RUN npm ci --omit=dev && npm install http-proxy-middleware
+RUN npm install --omit=dev && npm install http-proxy-middleware
 
 COPY --from=backend-build /app/backend/dist ./dist
 COPY --from=frontend-build /app/frontend/dist ./public

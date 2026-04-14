@@ -42,20 +42,19 @@ I set out to conquer the notorious "TCP Slow Start" limitation—the reason most
 
 You can deploy PureNet natively on your machine or launch it instantaneously utilizing our production-ready Docker container.
 
-### Option A: Docker (Recommended)
+### Option A: Docker Pull (Fastest)
 
-The easiest way to get PureNet running is via Docker. I have authored a highly optimized, multi-stage image.
+If you have Docker installed, you can simply pull the pre-built image and spin it up in seconds without compiling anything yourself.
 
-1. Ensure Docker is running.
-2. Build the production image:
+1. Pull the official image from Docker Hub:
    ```bash
-   docker build -t purenet:latest .
+   docker pull maheshkiran/purenet:latest
    ```
-3. Run the container seamlessly in the background:
+2. Run the container seamlessly in the background:
    ```bash
-   docker run -d -p 3000:3000 --name purenet-server purenet:latest
+   docker run -d -p 3000:3000 --name purenet-server maheshkiran/purenet:latest
    ```
-4. Access the app: `http://localhost:3000`
+3. Access the app instantly: `http://localhost:3000`
 
 ### Option B: Local Development via GitHub
 
