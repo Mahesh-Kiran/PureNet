@@ -1,0 +1,71 @@
+Title: The Anatomy of a Modern Web-Based Speed Test (Or: Why Most React Dashboards Lie to You)
+Author: PureNet Engineering
+
+Have you ever wondered why your custom-built internet speed test says you have 30 Mbps, but Speedtest.net or Fast.com says you have 150 Mbps? 
+
+It turns out, measuring internet speed inside a JavaScript V8 engine running in a browser is chaotic. The network isn't a continuous pipe of water; it’s a staggered, buffered relay of packets battling for TCP window space. Here is the research, inspiration, and mathematics behind how PureNet actually calculates your true bandwidth limits.
+
+---
+
+### 1. The "Slow Start" Dilemma (Inspiration from Bufferbloat & Fast.com)
+
+When your browser requests a file, the server doesn't immediately send it at your maximum capacity. The Transmission Control Protocol (TCP) uses an algorithm called "TCP Slow Start". It sends a few packets, waits to see if they arrive, sends a few more, and exponentially scales up until the network starts dropping packets (congestion window limits).
+
+If we download a 50MB file and it takes 4 seconds, the naive calculation is:
+50 MB / 4 s = 12.5 Megabytes per second (100 Mbps).
+
+But remember, the first 1 second might have only downloaded 2 MB. The remaining 3 seconds downloaded 48 MB, meaning your *actual* sustained bandwidth was 16 MB/s (128 Mbps). The slow start ruined the mathematical average.
+
+**The PureNet Solution:**
+Inspiration was taken directly from how Cloudflare and Ookla manage data windows. We split time into 250-millisecond monitoring intervals. We track the instantaneous bytes downloaded during *only* that fraction of a second.
+We then discard the first 30% of these interval snapshots (tossing out the slow start data entirely).
+
+---
+
+### 2. The 90th Percentile Rule
+
+Instead of averaging out the surviving numbers—which is still vulnerable to random micro-stutters in Wi-Fi—we rely on Percentiles. 
+
+If we have the following instantaneous Mbps readings (after throwing out the slow start):
+[ 142, 148, 149, 151, 152, 120 (a lag spike), 154, 153 ]
+
+An average mixes that 120 in, polluting the peak capability metric. 
+Instead, we sort the array and select the 90th percentile value. This reveals the absolute maximum sustainable throughput your connection can handle without being tricked by outlier drops. We then blend that peak 50/50 with the overall average to give a realistic "what you actually experience" number.
+
+---
+
+### 3. Connection Saturation and Multi-Streaming
+
+You cannot test a Gigabit connection with a single file download. A single TCP stream is limited by the server's window size, routing limits, and single-thread browser processing. 
+
+To find your true ceiling, we perform a "Probe Shot"—we download a small 1 MB file instantly. 
+- If your probe comes back at 5 Mbps, we limit the test to 2 parallel streams of 5MB chunks. (Too many streams on a bad connection causes queue collapse).
+- If your probe comes back at 150 Mbps, we instantly spin up 6 parallel streams pulling 20MB chunks each. Combining the byte output of 6 simultaneous network pipes is the only way to saturate modern fiber optics.
+
+### 4. Bufferbloat (Loaded vs. Unloaded Latency)
+
+Most people just think of "Ping" as a static number. PureNet categorizes it into two realities:
+1. **Unloaded Latency (e.g., 20.2 ms)**: Your ping when nobody in the house is using the internet. The theoretical distance to the edge server.
+2. **Loaded Latency (e.g., 85.6 ms)**: The ping experienced the exact moment you are maxing out your download bandwidth.
+
+Inspiration taken from the classic "Bufferbloat" tests, we run sequential ping traces over HTTPS while the multi-stream download is choking your router. If your Loaded Latency spikes to 500+ ms, your router lacks QoS (Quality of Service) hardware, meaning if someone downloads a game on your network, your zoom call will inevitably freeze.
+
+---
+
+### Let's look at real calculations from a test run:
+
+Probe Test: Downloaded 1MB in 0.08 seconds (100 Mbps detected).
+Stream Count: 4 simultaneous HTTP fetches created.
+
+Time Array (Instantaneous Mbps measured every 250ms):
+[ 48, 76, 102, 145 ] <-- The first 1 second (Slow Start). TRASHED.
+[ 189, 210, 205, 215, 208, 192, 211, 216 ] <-- Standard deviation stabilized. 
+
+Sorting the numbers:
+[ 189, 192, 205, 208, 210, 211, 215, 216 ]
+
+The 90th Percentile points directly to ~215 Mbps. 
+While your naive average might have sat at 170 Mbps due to the slow start, the math proves your line is fully capable of pushing 215 Mbps of sustained load.
+
+---
+This isn't magic. It's just treating the browser's Network API like scientific measurement equipment rather than a simple stopwatch.

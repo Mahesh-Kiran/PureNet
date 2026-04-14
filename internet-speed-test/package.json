@@ -1,12 +1,13 @@
 {
-  "name": "internet-speed-test",
+  "name": "purenet",
   "private": true,
   "workspaces": ["backend", "frontend"],
   "scripts": {
     "dev": "concurrently \"npm --workspace backend run dev\" \"npm --workspace frontend run dev\"",
-    "build": "npm --workspace backend run build && npm --workspace frontend run build"
+    "build": "npm --workspace frontend run build && npm --workspace backend run build",
+    "start": "npm --workspace backend run start"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
   }
-} 
+}

@@ -111,15 +111,18 @@ async function runDownload(
   const probeMbps = (pb.size * 8) / ((performance.now() - pt0) / 1000) / 1e6;
 
   let streamCount: number, bytesPerStream: number;
-  if (probeMbps < 10) { streamCount = 2; bytesPerStream = 4 * 1024 * 1024; }
-  else if (probeMbps < 50) { streamCount = 3; bytesPerStream = 8 * 1024 * 1024; }
-  else if (probeMbps < 200) { streamCount = 4; bytesPerStream = 12 * 1024 * 1024; }
-  else { streamCount = 6; bytesPerStream = 16 * 1024 * 1024; }
+  if (probeMbps < 10) { streamCount = 2; bytesPerStream = 5 * 1024 * 1024; }
+  else if (probeMbps < 50) { streamCount = 4; bytesPerStream = 10 * 1024 * 1024; }
+  else if (probeMbps < 200) { streamCount = 6; bytesPerStream = 20 * 1024 * 1024; }
+  else { streamCount = 8; bytesPerStream = 30 * 1024 * 1024; }
 
   const totalBytes = streamCount * bytesPerStream;
   const speeds: number[] = [];
   let globalReceived = 0;
   const testStart = performance.now();
+  let lastReceived = 0;
+  let lastTime = testStart;
+  let ema = probeMbps;
 
   onProgress(probeMbps, 0);
   onLivePoint({ time: 0, speed: +probeMbps.toFixed(2), phase: "download" });
@@ -128,35 +131,42 @@ async function runDownload(
 
   const streams = Array.from({ length: streamCount }, async () => {
     const res = await fetch(`/cf-speed/__down?bytes=${bytesPerStream}`, { cache: "no-store" });
-    const reader = res.body!.getReader();
-    while (true) { const { done, value } = await reader.read(); if (done) break; globalReceived += value.length; }
+    if (!res.body) return;
+    const reader = res.body.getReader();
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      globalReceived += value.length;
+    }
   });
 
   const monitor = setInterval(() => {
-    const elapsed = (performance.now() - testStart) / 1000;
-    if (elapsed > 0.3) {
-      const mbps = (globalReceived * 8) / elapsed / 1e6;
-      speeds.push(mbps);
-      onProgress(mbps, Math.min(globalReceived / totalBytes, 1));
-      onLivePoint({ time: +elapsed.toFixed(1), speed: +mbps.toFixed(2), phase: "download" });
+    const now = performance.now();
+    const dt = (now - lastTime) / 1000;
+    const bytes = globalReceived - lastReceived;
+    if (dt > 0 && bytes > 0) {
+      const instMbps = (bytes * 8) / dt / 1e6;
+      speeds.push(instMbps);
+      ema = ema * 0.6 + instMbps * 0.4;
+      onProgress(ema, Math.min(globalReceived / totalBytes, 1));
+      onLivePoint({ time: +((now - testStart) / 1000).toFixed(1), speed: +ema.toFixed(2), phase: "download" });
     }
-  }, 400);
+    lastReceived = globalReceived;
+    lastTime = now;
+  }, 250);
 
   await Promise.all(streams);
   clearInterval(monitor);
   clearInterval(latTimer);
 
-  if (speeds.length > 3) {
-    const stable = speeds.slice(Math.floor(speeds.length * 0.4));
-    if (stable.length > 2) {
-      const s = [...stable].sort((a, b) => a - b);
-      const q1 = s[Math.floor(s.length * 0.25)], q3 = s[Math.floor(s.length * 0.75)];
-      const f = stable.filter((v) => v >= q1 && v <= q3 * 1.5);
-      if (f.length) return f.reduce((a, b) => a + b, 0) / f.length;
-    }
-    return stable.reduce((a, b) => a + b, 0) / stable.length;
+  const overallAvg = (globalReceived * 8) / ((performance.now() - testStart) / 1000) / 1e6;
+  if (speeds.length > 5) {
+    const stable = speeds.slice(Math.floor(speeds.length * 0.3)); // drop first 30% (slow start)
+    const sorted = [...stable].sort((a, b) => a - b);
+    const p90 = sorted[Math.floor(sorted.length * 0.9)] || overallAvg;
+    return (p90 + overallAvg) / 2; // mix peak sustainable with overall avg for realistic feel
   }
-  return (globalReceived * 8) / ((performance.now() - testStart) / 1000) / 1e6;
+  return overallAvg;
 }
 
 async function runUpload(
@@ -165,19 +175,21 @@ async function runUpload(
   timeOffset: number,
   onLatency: (ms: number) => void,
 ): Promise<number> {
-  const probeBuf = new Uint8Array(512 * 1024);
+  const probeBuf = new Uint8Array(1024 * 1024);
   const pt0 = performance.now();
   await fetch("/cf-speed/__up", { method: "POST", body: probeBuf });
   const probeMbps = (probeBuf.length * 8) / ((performance.now() - pt0) / 1000) / 1e6;
 
   let uploadBytes: number;
   if (probeMbps < 5) uploadBytes = 2 * 1024 * 1024;
-  else if (probeMbps < 25) uploadBytes = 5 * 1024 * 1024;
-  else if (probeMbps < 100) uploadBytes = 15 * 1024 * 1024;
-  else uploadBytes = 25 * 1024 * 1024;
+  else if (probeMbps < 25) uploadBytes = 8 * 1024 * 1024;
+  else if (probeMbps < 100) uploadBytes = 20 * 1024 * 1024;
+  else uploadBytes = 40 * 1024 * 1024;
 
   const buffer = new Uint8Array(uploadBytes);
   const start = performance.now();
+  let ema = probeMbps;
+
   onProgress(probeMbps, 0);
   onLivePoint({ time: +(timeOffset + 0.3).toFixed(1), speed: +probeMbps.toFixed(2), phase: "upload" });
 
@@ -187,30 +199,36 @@ async function runUpload(
     const xhr = new XMLHttpRequest();
     xhr.open("POST", "/cf-speed/__up");
     let lastT = start, lastB = 0;
-    const speeds: number[] = [probeMbps];
+    const speeds: number[] = [];
 
     xhr.upload.onprogress = (e) => {
       if (!e.lengthComputable) return;
       const now = performance.now();
-      if (now - lastT >= 350) {
-        const mbps = ((e.loaded - lastB) * 8) / ((now - lastT) / 1000) / 1e6;
-        speeds.push(mbps);
-        onProgress(mbps, e.loaded / e.total);
-        onLivePoint({ time: +(timeOffset + (now - start) / 1000 + 0.5).toFixed(1), speed: +mbps.toFixed(2), phase: "upload" });
+      const dt = (now - lastT) / 1000;
+      if (dt >= 0.25) {
+        const bytes = e.loaded - lastB;
+        if (bytes > 0) {
+          const instMbps = (bytes * 8) / dt / 1e6;
+          speeds.push(instMbps);
+          ema = ema * 0.6 + instMbps * 0.4;
+          onProgress(ema, e.loaded / e.total);
+          onLivePoint({ time: +(timeOffset + (now - start) / 1000 + 0.5).toFixed(1), speed: +ema.toFixed(2), phase: "upload" });
+        }
         lastT = now; lastB = e.loaded;
       }
     };
 
     xhr.onload = () => {
       clearInterval(latTimer);
-      if (speeds.length > 3) {
-        const stable = speeds.slice(Math.floor(speeds.length * 0.3));
-        const s = [...stable].sort((a, b) => a - b);
-        const q1 = s[Math.floor(s.length * 0.25)], q3 = s[Math.floor(s.length * 0.75)];
-        const f = stable.filter((v) => v >= q1 && v <= q3 * 1.5);
-        if (f.length) { resolve(f.reduce((a, b) => a + b, 0) / f.length); return; }
-        resolve(stable.reduce((a, b) => a + b, 0) / stable.length);
-      } else { resolve((uploadBytes * 8) / ((performance.now() - start) / 1000) / 1e6); }
+      const overallAvg = (uploadBytes * 8) / ((performance.now() - start) / 1000) / 1e6;
+      if (speeds.length > 4) {
+        const stable = speeds.slice(Math.floor(speeds.length * 0.2));
+        const sorted = [...stable].sort((a, b) => a - b);
+        const p90 = sorted[Math.floor(sorted.length * 0.9)] || overallAvg;
+        resolve((p90 + overallAvg) / 2);
+      } else {
+        resolve(overallAvg);
+      }
     };
     xhr.onerror = () => { clearInterval(latTimer); resolve((uploadBytes * 8) / ((performance.now() - start) / 1000) / 1e6); };
     xhr.send(buffer);

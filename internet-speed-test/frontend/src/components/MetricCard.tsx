@@ -1,4 +1,6 @@
 import { formatSpeed } from "../hooks/useSpeedTest";
+import { METRIC_DEFS } from "../helpers/insights";
+import Tooltip from "./Tooltip";
 
 type Props = {
   label: string;
@@ -12,8 +14,19 @@ type Props = {
 
 export default function MetricCard({ label, value, unit, icon, accentColor = "var(--cyan)", isSpeed, delay = 0 }: Props) {
   const display = isSpeed ? formatSpeed(value) : { value: value.toFixed(1), unit };
-  return (
-    <div className={`glass anim-scale-in ${delay ? `delay-${delay}` : ""}`} style={{ padding: "14px 16px" }}>
+  const key = label.toLowerCase();
+  const def = METRIC_DEFS[key];
+
+  const tip = def ? (
+    <div>
+      <p style={{ fontWeight: 600, fontSize: "0.72rem", marginBottom: 4, color: "#fff" }}>{def.title}</p>
+      <p style={{ fontSize: "0.62rem", opacity: 0.75, marginBottom: 6 }}>{def.description}</p>
+      <p style={{ fontSize: "0.64rem", color: accentColor, fontWeight: 500 }}>{def.interpret(value)}</p>
+    </div>
+  ) : null;
+
+  const card = (
+    <div className={`glass anim-scale-in ${delay ? `delay-${delay}` : ""}`} style={{ padding: "14px 16px", cursor: def ? "help" : "default" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
         <span className="material-icons-round" style={{
           fontSize: 18, width: 30, height: 30,
@@ -31,4 +44,6 @@ export default function MetricCard({ label, value, unit, icon, accentColor = "va
       </div>
     </div>
   );
+
+  return tip ? <Tooltip content={tip}>{card}</Tooltip> : card;
 }
