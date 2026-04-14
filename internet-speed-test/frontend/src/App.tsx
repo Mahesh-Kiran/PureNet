@@ -7,154 +7,119 @@ import LiveGraph from "./components/LiveGraph";
 import ConnectionInfo from "./components/ConnectionInfo";
 import { useSpeedTest, formatSpeed } from "./hooks/useSpeedTest";
 
-function App() {
-  const {
-    state, startTest, resetTest, isRunning,
-    history, liveData, clientInfo, connectionLabel,
-  } = useSpeedTest();
+const Icon = ({ name, size = 16, color }: { name: string; size?: number; color?: string }) => (
+  <span className="material-icons-round" style={{ fontSize: size, color }}>{name}</span>
+);
 
+function App() {
+  const { state, startTest, isRunning, history, liveData, clientInfo, connectionLabel } = useSpeedTest();
   const done = state.phase === "done" && state.downloadMbps > 0;
-  const showGraph = liveData.length > 1 || isRunning;
 
   return (
     <LayoutShell>
       <div className="app-shell">
-        {/* ── LEFT PANEL (40%) ── */}
         <div className="panel-left">
-          {/* Header */}
-          <div style={{
-            position: "absolute", top: 16, left: 20, right: 20,
-            display: "flex", alignItems: "center", justifyContent: "space-between",
-          }}>
+          <div className="header-bar glass-flat">
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <img src="/logo.png" alt="PureNet" style={{ width: 30, height: 30, objectFit: "contain" }} />
+              <a href="/"><img src="/logo.png" alt="PureNet" style={{ width: 30, height: 30, objectFit: "contain" }} /></a>
               <div>
-                <h1 style={{ fontSize: "0.9rem", fontWeight: 700 }}>PureNet</h1>
-                <p style={{ fontSize: "0.48rem", color: "var(--text-3)", letterSpacing: "0.12em", textTransform: "uppercase" as const }}>Speed Test</p>
+                <h1 style={{ fontSize: "0.9rem", fontWeight: 700, lineHeight: 1.1 }}>PureNet</h1>
+                <p style={{ fontSize: "0.44rem", color: "var(--text-3)", letterSpacing: "0.12em", textTransform: "uppercase" as const, fontWeight: 500 }}>Speed Test</p>
               </div>
             </div>
             <div className="chip">
-              <span style={{ width: 5, height: 5, borderRadius: "50%", background: isRunning ? "var(--cyan)" : done ? "var(--green)" : "var(--text-3)" }} />
+              <span style={{
+                width: 6, height: 6, borderRadius: "50%",
+                background: isRunning ? "var(--cyan)" : done ? "var(--green)" : "var(--text-3)",
+                transition: "background 0.3s ease",
+              }} />
               {isRunning ? "Testing" : connectionLabel}
             </div>
           </div>
 
-          {/* Gauge — positioned higher when test is done to make room for stats */}
-          <div style={{ marginTop: done ? "-40px" : "0", transition: "margin 0.3s ease" }}>
-            <SpeedGauge
-              downloadMbps={state.downloadMbps}
-              uploadMbps={state.uploadMbps}
-              phase={state.phase}
-              progress={state.progress}
-            />
-          </div>
-
-          {/* Button — AGAIN re-runs the test */}
-          <div style={{ marginTop: 12 }}>
-            <TestControls phase={state.phase} onStart={startTest} onAgain={startTest} />
-          </div>
-
-          {/* Big stats at bottom of left panel */}
           {done && (
-            <div style={{
-              position: "absolute", bottom: 14, left: 14, right: 14,
-              display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8,
-            }}>
+            <div className="anim-fade-up" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, width: "100%", maxWidth: 340, marginBottom: 8 }}>
               {[
-                { label: "Download", val: formatSpeed(state.downloadMbps), color: "var(--cyan)" },
-                { label: "Upload", val: formatSpeed(state.uploadMbps), color: "var(--purple)" },
-                { label: "Ping", val: { value: state.unloadedLatency.toFixed(1), unit: "ms" }, color: "var(--green)" },
-              ].map((s) => (
-                <div key={s.label} className="glass" style={{ padding: "10px 8px", textAlign: "center" as const }}>
-                  <p className="label" style={{ marginBottom: 3, fontSize: "0.5rem" }}>{s.label}</p>
-                  <p style={{ fontSize: "1.15rem", fontWeight: 700, color: s.color, fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>
-                    {s.val.value}
-                  </p>
-                  <p style={{ fontSize: "0.45rem", color: "var(--text-3)", marginTop: 2 }}>{s.val.unit}</p>
+                { label: "Download", val: formatSpeed(state.downloadMbps), color: "var(--cyan)", icon: "download" },
+                { label: "Upload", val: formatSpeed(state.uploadMbps), color: "var(--purple)", icon: "upload" },
+                { label: "Ping", val: { value: state.unloadedLatency.toFixed(1), unit: "ms" }, color: "var(--green)", icon: "speed" },
+              ].map((s, i) => (
+                <div key={s.label} className={`glass anim-scale-in delay-${i + 1}`} style={{ padding: "10px 6px", textAlign: "center" as const }}>
+                  <Icon name={s.icon} size={14} color={s.color} />
+                  <p className="label" style={{ marginBottom: 2, marginTop: 2 }}>{s.label}</p>
+                  <p style={{ fontSize: "1.15rem", fontWeight: 700, color: s.color, fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>{s.val.value}</p>
+                  <p style={{ fontSize: "0.42rem", color: "var(--text-3)", marginTop: 3 }}>{s.val.unit}</p>
                 </div>
               ))}
             </div>
           )}
+
+          <SpeedGauge downloadMbps={state.downloadMbps} uploadMbps={state.uploadMbps} phase={state.phase} progress={state.progress} />
+
+          <div style={{ marginTop: 14 }}>
+            <TestControls phase={state.phase} onStart={startTest} onAgain={startTest} />
+          </div>
         </div>
 
-        {/* ── RIGHT PANEL (60%) ── */}
         <div className="panel-right">
-          {/* Connection info bar */}
           {clientInfo && (
-            <div className="glass-flat" style={{
-              padding: "10px 16px",
-              display: "flex", flexWrap: "wrap" as const,
-              gap: "4px 14px", fontSize: "0.62rem", color: "var(--text-3)", lineHeight: 2,
-            }}>
-              {/* Client city — always show if available */}
+            <div className="glass-flat anim-fade-in" style={{ padding: "10px 16px", display: "flex", flexWrap: "wrap" as const, gap: "4px 14px", fontSize: "0.65rem", color: "var(--text-3)", lineHeight: 2, alignItems: "center" }}>
               {clientInfo.city !== "—" && (
-                <span><strong style={{ color: "var(--text-2)" }}>Client</strong> {clientInfo.city}, {clientInfo.country}</span>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                  <Icon name="location_on" size={13} color="var(--text-3)" />
+                  <strong style={{ color: "var(--text-2)" }}>Client</strong> {clientInfo.city}, {clientInfo.country}
+                </span>
               )}
-              {/* Fallback: show country from Cloudflare trace if no city */}
               {clientInfo.city === "—" && clientInfo.country !== "—" && (
-                <span><strong style={{ color: "var(--text-2)" }}>Client</strong> {clientInfo.country}</span>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                  <Icon name="public" size={13} color="var(--text-3)" />
+                  <strong style={{ color: "var(--text-2)" }}>Client</strong> {clientInfo.country}
+                </span>
               )}
-              {/* IP */}
               {clientInfo.ip !== "—" && (
-                <span style={{
-                  fontSize: "0.56rem", padding: "1px 6px",
-                  background: "rgba(255,255,255,0.5)", borderRadius: 3,
-                  border: "1px solid rgba(0,0,0,0.04)",
-                  fontVariantNumeric: "tabular-nums",
-                }}>{clientInfo.ip}</span>
+                <span style={{ fontSize: "0.58rem", padding: "2px 8px", background: "rgba(255,255,255,0.5)", borderRadius: 4, border: "1px solid rgba(0,0,0,0.04)", fontVariantNumeric: "tabular-nums", fontFamily: "monospace" }}>{clientInfo.ip}</span>
               )}
-              {/* ISP */}
               {clientInfo.isp !== "—" && (
-                <span><strong style={{ color: "var(--text-2)" }}>ISP</strong> {clientInfo.isp}</span>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                  <Icon name="router" size={13} color="var(--text-3)" />
+                  <strong style={{ color: "var(--text-2)" }}>ISP</strong> {clientInfo.isp}
+                </span>
               )}
-              {/* Server — from Cloudflare edge */}
               {clientInfo.colo !== "—" && (
-                <span>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                  <Icon name="dns" size={13} color="var(--text-3)" />
                   <strong style={{ color: "var(--text-2)" }}>Server</strong> {clientInfo.coloCity} ({clientInfo.colo})
                 </span>
               )}
             </div>
           )}
 
-          {/* Live graph */}
-          {showGraph && <LiveGraph data={liveData} isRunning={isRunning} />}
+          {(liveData.length > 1 || isRunning) && <LiveGraph data={liveData} isRunning={isRunning} />}
 
-          {/* Results */}
           {done && (
-            <>
-              <ConnectionInfo
-                clientInfo={null}
-                unloadedLatency={state.unloadedLatency}
-                loadedLatency={state.loadedLatency}
-                uploadMbps={state.uploadMbps}
-                show={true}
-              />
-
-              <div style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(min(140px, 100%), 1fr))",
-                gap: 10,
-              }}>
-                <MetricCard label="Download" value={state.downloadMbps} unit="Mbps" icon="↓" accentColor="#0ea5e9" isSpeed />
-                <MetricCard label="Upload" value={state.uploadMbps} unit="Mbps" icon="↑" accentColor="#8b5cf6" isSpeed />
-                <MetricCard label="Ping" value={state.unloadedLatency} unit="ms" icon="◉" accentColor="#10b981" />
-                <MetricCard label="Jitter" value={state.jitterMs} unit="ms" icon="◈" accentColor="#f59e0b" />
+            <div className="anim-fade-up">
+              <ConnectionInfo unloadedLatency={state.unloadedLatency} loadedLatency={state.loadedLatency} uploadMbps={state.uploadMbps} />
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(140px, 100%), 1fr))", gap: 10, marginTop: 10 }}>
+                <MetricCard label="Download" value={state.downloadMbps} unit="Mbps" icon="download" accentColor="#0ea5e9" isSpeed delay={1} />
+                <MetricCard label="Upload" value={state.uploadMbps} unit="Mbps" icon="upload" accentColor="#8b5cf6" isSpeed delay={2} />
+                <MetricCard label="Ping" value={state.unloadedLatency} unit="ms" icon="speed" accentColor="#10b981" delay={3} />
+                <MetricCard label="Jitter" value={state.jitterMs} unit="ms" icon="swap_vert" accentColor="#f59e0b" delay={4} />
               </div>
-            </>
-          )}
-
-          {/* History */}
-          {history.length > 0 && <HistoryChart history={history} />}
-
-          {/* Empty state */}
-          {!isRunning && !done && history.length === 0 && (
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1, opacity: 0.35, gap: 6 }}>
-              <p style={{ fontSize: "0.72rem", color: "var(--text-3)" }}>Results will appear here</p>
-              <p style={{ fontSize: "0.6rem", color: "var(--text-3)" }}>Press GO to start</p>
             </div>
           )}
 
-          <p style={{ marginTop: "auto", paddingTop: 12, fontSize: "0.5rem", color: "var(--text-3)", opacity: 0.4, textAlign: "center" as const }}>
+          {history.length > 0 && <HistoryChart history={history} />}
+
+          {!isRunning && !done && history.length === 0 && (
+            <div className="anim-fade-in" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", flex: 1, opacity: 0.35, gap: 8 }}>
+              <Icon name="speed" size={32} color="var(--text-3)" />
+              <p style={{ fontSize: "0.75rem", color: "var(--text-3)" }}>Results will appear here</p>
+              <p style={{ fontSize: "0.62rem", color: "var(--text-3)" }}>Press GO to start</p>
+            </div>
+          )}
+
+          <p style={{ marginTop: "auto", paddingTop: 12, fontSize: "0.5rem", color: "var(--text-3)", opacity: 0.4, textAlign: "center" as const, display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
+            <Icon name="bolt" size={11} color="var(--text-3)" />
             PureNet · Powered by Cloudflare Edge Network
           </p>
         </div>

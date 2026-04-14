@@ -6,18 +6,14 @@ type Props = { history: SpeedResult[] };
 const Tip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
   return (
-    <div style={{
-      background: "rgba(255,255,255,0.85)", backdropFilter: "blur(10px)",
-      border: "1px solid rgba(255,255,255,0.6)", borderRadius: 10,
-      padding: "8px 12px", boxShadow: "0 2px 8px rgba(0,0,0,0.06)", minWidth: 120,
-    }}>
+    <div style={{ background: "rgba(255,255,255,0.88)", backdropFilter: "blur(12px)", border: "1px solid rgba(255,255,255,0.6)", borderRadius: 10, padding: "8px 12px", boxShadow: "0 4px 12px rgba(0,0,0,0.06)", minWidth: 120 }}>
       <p style={{ fontSize: "0.5rem", color: "var(--text-3)", marginBottom: 4 }}>{label}</p>
       {payload.map((p: any) => {
         const f = formatSpeed(p.value);
         return (
           <div key={p.dataKey} style={{ display: "flex", justifyContent: "space-between", gap: 10, marginBottom: 1 }}>
             <span style={{ fontSize: "0.58rem", color: p.color, textTransform: "capitalize" }}>{p.dataKey}</span>
-            <span style={{ fontSize: "0.7rem", fontWeight: 700 }}>{f.value} <span style={{ fontSize: "0.45rem", color: "var(--text-3)" }}>{f.unit}</span></span>
+            <span style={{ fontSize: "0.72rem", fontWeight: 700 }}>{f.value} <span style={{ fontSize: "0.45rem", color: "var(--text-3)" }}>{f.unit}</span></span>
           </div>
         );
       })}
@@ -34,17 +30,20 @@ export default function HistoryChart({ history }: Props) {
   if (!data.length) return null;
 
   return (
-    <div className="glass-flat" style={{ padding: "16px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
-        <p style={{ fontSize: "0.68rem", fontWeight: 600, color: "var(--text-2)" }}>Session History</p>
+    <div className="glass-flat anim-fade-up delay-3" style={{ padding: "16px" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <span className="material-icons-round" style={{ fontSize: 16, color: "var(--text-3)" }}>history</span>
+          <p style={{ fontSize: "0.7rem", fontWeight: 600, color: "var(--text-2)" }}>Session History</p>
+        </div>
         <span className="label">{data.length} {data.length === 1 ? "run" : "runs"}</span>
       </div>
       <div style={{ height: 160 }}>
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={data} margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
             <defs>
-              <linearGradient id="hd" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#0ea5e9" stopOpacity={0.12} /><stop offset="100%" stopColor="#0ea5e9" stopOpacity={0.01} /></linearGradient>
-              <linearGradient id="hu" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.1} /><stop offset="100%" stopColor="#8b5cf6" stopOpacity={0.01} /></linearGradient>
+              <linearGradient id="hd" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#0ea5e9" stopOpacity={0.14} /><stop offset="100%" stopColor="#0ea5e9" stopOpacity={0.01} /></linearGradient>
+              <linearGradient id="hu" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.12} /><stop offset="100%" stopColor="#8b5cf6" stopOpacity={0.01} /></linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.04)" vertical={false} />
             <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: "#9299a6", fontSize: 10 }} />
@@ -56,12 +55,8 @@ export default function HistoryChart({ history }: Props) {
         </ResponsiveContainer>
       </div>
       <div style={{ display: "flex", justifyContent: "center", gap: 16, marginTop: 8 }}>
-        {[{ c: "#0ea5e9", l: "Download" }, { c: "#8b5cf6", l: "Upload" }].map(i => (
-          <span key={i.l} style={{ display: "flex", alignItems: "center", gap: 4 }}>
-            <span style={{ width: 10, height: 2, borderRadius: 1, background: i.c }} />
-            <span className="label">{i.l}</span>
-          </span>
-        ))}
+        <span style={{ display: "flex", alignItems: "center", gap: 5 }}><span style={{ width: 12, height: 2.5, borderRadius: 2, background: "#0ea5e9" }} /><span className="label">Download</span></span>
+        <span style={{ display: "flex", alignItems: "center", gap: 5 }}><span style={{ width: 12, height: 2.5, borderRadius: 2, background: "#8b5cf6" }} /><span className="label">Upload</span></span>
       </div>
     </div>
   );

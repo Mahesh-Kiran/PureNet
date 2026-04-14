@@ -1,10 +1,5 @@
-// frontend/src/hooks/useSpeedTest.ts
-// Production speed test — multi-stream downloads from Cloudflare CDN edge,
-// direct HTTPS latency measurement, IQR-filtered averaging.
-// Matches fast.com/speedtest.net methodology: parallel connections to saturate pipe.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-/* ── Types ─────────────────────────────────────────────────────────── */
 export type TestPhase = "idle" | "ping" | "download" | "upload" | "done";
 export type LiveDataPoint = { time: number; speed: number; phase: "download" | "upload" };
 export type SpeedResult = {
@@ -27,7 +22,6 @@ const INIT: State = {
   unloadedLatency: 0, loadedLatency: 0, phase: "idle", progress: 0,
 };
 
-/* ── Colo map ──────────────────────────────────────────────────────── */
 const COLO: Record<string, string> = {
   BOM: "Mumbai", DEL: "Delhi", MAA: "Chennai", HYD: "Hyderabad",
   BLR: "Bangalore", CCU: "Kolkata", AMD: "Ahmedabad", NAG: "Nagpur",
@@ -39,7 +33,6 @@ const COLO: Record<string, string> = {
   YYZ: "Toronto", GRU: "São Paulo", JNB: "Johannesburg",
 };
 
-/* ── Helpers ───────────────────────────────────────────────────────── */
 export function formatSpeed(mbps: number): FormattedSpeed {
   if (mbps <= 0) return { value: "0", unit: "Mbps" };
   if (mbps >= 1000) return { value: (mbps / 1000).toFixed(2), unit: "Gbps" };
@@ -60,7 +53,6 @@ export function getConnectionLabel(mbps: number): string {
   return "Ultra Fast";
 }
 
-/* ── Client info ───────────────────────────────────────────────────── */
 async function fetchClientInfo(): Promise<ClientInfo> {
   const info: ClientInfo = { ip: "—", city: "—", region: "—", country: "—", isp: "—", colo: "—", coloCity: "—" };
   try {
@@ -84,24 +76,16 @@ async function fetchClientInfo(): Promise<ClientInfo> {
   return info;
 }
 
-/* ── Unloaded latency — DIRECT to Cloudflare (bypasses Vite proxy) ── */
 async function measurePing(samples = 15): Promise<{ pingMs: number; jitterMs: number }> {
   const url = "https://cloudflare.com/cdn-cgi/trace";
   const times: number[] = [];
-
-  // Warmup (establishes TCP+TLS)
-  for (let i = 0; i < 3; i++) {
-    await fetch(url, { cache: "no-store", mode: "no-cors" }).catch(() => {});
-  }
-
+  for (let i = 0; i < 3; i++) await fetch(url, { cache: "no-store", mode: "no-cors" }).catch(() => {});
   for (let i = 0; i < samples; i++) {
     const t0 = performance.now();
     await fetch(url, { cache: "no-store", mode: "no-cors" });
     times.push(performance.now() - t0);
   }
-
   const sorted = [...times].sort((a, b) => a - b);
-  // Remove top/bottom 20% outliers
   const cut = Math.floor(sorted.length * 0.2);
   const trimmed = sorted.slice(cut, sorted.length - cut);
   const avg = trimmed.reduce((a, b) => a + b, 0) / trimmed.length;
@@ -110,122 +94,82 @@ async function measurePing(samples = 15): Promise<{ pingMs: number; jitterMs: nu
   return { pingMs: avg, jitterMs: jitter };
 }
 
-/* ── Loaded latency — DIRECT (during traffic) ──────────────────────── */
 async function pingOnce(): Promise<number> {
   const t0 = performance.now();
   await fetch("https://cloudflare.com/cdn-cgi/trace", { cache: "no-store", mode: "no-cors" });
   return performance.now() - t0;
 }
 
-/* ── Multi-stream download (like fast.com) ─────────────────────────── */
-// Opens N parallel streams to saturate the connection, measures aggregate throughput.
 async function runDownload(
   onProgress: (mbps: number, frac: number) => void,
   onLivePoint: (p: LiveDataPoint) => void,
   onLatency: (ms: number) => void,
 ): Promise<number> {
-  // Step 1: Quick probe to determine connection speed class
-  const probeBytes = 1024 * 1024; // 1MB
   const pt0 = performance.now();
-  const pr = await fetch(`/cf-speed/__down?bytes=${probeBytes}`, { cache: "no-store" });
+  const pr = await fetch(`/cf-speed/__down?bytes=1048576`, { cache: "no-store" });
   const pb = await pr.blob();
-  const probeTime = (performance.now() - pt0) / 1000;
-  const probeMbps = (pb.size * 8) / probeTime / 1e6;
+  const probeMbps = (pb.size * 8) / ((performance.now() - pt0) / 1000) / 1e6;
 
-  // Step 2: Choose download strategy based on speed
-  let streamCount: number;
-  let bytesPerStream: number;
-  if (probeMbps < 10) {
-    streamCount = 2;
-    bytesPerStream = 4 * 1024 * 1024;
-  } else if (probeMbps < 50) {
-    streamCount = 3;
-    bytesPerStream = 8 * 1024 * 1024;
-  } else if (probeMbps < 200) {
-    streamCount = 4;
-    bytesPerStream = 12 * 1024 * 1024;
-  } else {
-    streamCount = 6;
-    bytesPerStream = 16 * 1024 * 1024;
-  }
+  let streamCount: number, bytesPerStream: number;
+  if (probeMbps < 10) { streamCount = 2; bytesPerStream = 4 * 1024 * 1024; }
+  else if (probeMbps < 50) { streamCount = 3; bytesPerStream = 8 * 1024 * 1024; }
+  else if (probeMbps < 200) { streamCount = 4; bytesPerStream = 12 * 1024 * 1024; }
+  else { streamCount = 6; bytesPerStream = 16 * 1024 * 1024; }
 
   const totalBytes = streamCount * bytesPerStream;
   const speeds: number[] = [];
   let globalReceived = 0;
   const testStart = performance.now();
 
-  // Report probe
   onProgress(probeMbps, 0);
   onLivePoint({ time: 0, speed: +probeMbps.toFixed(2), phase: "download" });
 
-  // Loaded latency during download
-  const latTimer = setInterval(async () => {
-    try { onLatency(await pingOnce()); } catch {}
-  }, 1500);
+  const latTimer = setInterval(async () => { try { onLatency(await pingOnce()); } catch {} }, 1500);
 
-  // Step 3: Open parallel streams
-  const streamPromises = Array.from({ length: streamCount }, async () => {
+  const streams = Array.from({ length: streamCount }, async () => {
     const res = await fetch(`/cf-speed/__down?bytes=${bytesPerStream}`, { cache: "no-store" });
     const reader = res.body!.getReader();
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      globalReceived += value.length;
-    }
+    while (true) { const { done, value } = await reader.read(); if (done) break; globalReceived += value.length; }
   });
 
-  // Step 4: Measure aggregate throughput in a monitoring loop
-  const monitorInterval = setInterval(() => {
+  const monitor = setInterval(() => {
     const elapsed = (performance.now() - testStart) / 1000;
     if (elapsed > 0.3) {
-      const currentMbps = (globalReceived * 8) / elapsed / 1e6;
-      speeds.push(currentMbps);
-      const frac = Math.min(globalReceived / totalBytes, 1);
-      onProgress(currentMbps, frac);
-      onLivePoint({
-        time: +elapsed.toFixed(1),
-        speed: +currentMbps.toFixed(2),
-        phase: "download",
-      });
+      const mbps = (globalReceived * 8) / elapsed / 1e6;
+      speeds.push(mbps);
+      onProgress(mbps, Math.min(globalReceived / totalBytes, 1));
+      onLivePoint({ time: +elapsed.toFixed(1), speed: +mbps.toFixed(2), phase: "download" });
     }
   }, 400);
 
-  await Promise.all(streamPromises);
-  clearInterval(monitorInterval);
+  await Promise.all(streams);
+  clearInterval(monitor);
   clearInterval(latTimer);
 
-  // Step 5: Calculate final speed — use last 60% of measurements (skip ramp-up)
   if (speeds.length > 3) {
     const stable = speeds.slice(Math.floor(speeds.length * 0.4));
     if (stable.length > 2) {
-      const sorted = [...stable].sort((a, b) => a - b);
-      const q1 = sorted[Math.floor(sorted.length * 0.25)];
-      const q3 = sorted[Math.floor(sorted.length * 0.75)];
-      const filtered = stable.filter((v) => v >= q1 && v <= q3 * 1.5);
-      if (filtered.length > 0) return filtered.reduce((a, b) => a + b, 0) / filtered.length;
+      const s = [...stable].sort((a, b) => a - b);
+      const q1 = s[Math.floor(s.length * 0.25)], q3 = s[Math.floor(s.length * 0.75)];
+      const f = stable.filter((v) => v >= q1 && v <= q3 * 1.5);
+      if (f.length) return f.reduce((a, b) => a + b, 0) / f.length;
     }
     return stable.reduce((a, b) => a + b, 0) / stable.length;
   }
-
-  const totalTime = (performance.now() - testStart) / 1000;
-  return (globalReceived * 8) / totalTime / 1e6;
+  return (globalReceived * 8) / ((performance.now() - testStart) / 1000) / 1e6;
 }
 
-/* ── Upload test ───────────────────────────────────────────────────── */
 async function runUpload(
   onProgress: (mbps: number, frac: number) => void,
   onLivePoint: (p: LiveDataPoint) => void,
   timeOffset: number,
   onLatency: (ms: number) => void,
 ): Promise<number> {
-  // Probe (512KB)
   const probeBuf = new Uint8Array(512 * 1024);
   const pt0 = performance.now();
   await fetch("/cf-speed/__up", { method: "POST", body: probeBuf });
-  const probeTime = (performance.now() - pt0) / 1000;
-  const probeMbps = (probeBuf.length * 8) / probeTime / 1e6;
+  const probeMbps = (probeBuf.length * 8) / ((performance.now() - pt0) / 1000) / 1e6;
 
-  // Choose upload size
   let uploadBytes: number;
   if (probeMbps < 5) uploadBytes = 2 * 1024 * 1024;
   else if (probeMbps < 25) uploadBytes = 5 * 1024 * 1024;
@@ -234,18 +178,14 @@ async function runUpload(
 
   const buffer = new Uint8Array(uploadBytes);
   const start = performance.now();
-
   onProgress(probeMbps, 0);
   onLivePoint({ time: +(timeOffset + 0.3).toFixed(1), speed: +probeMbps.toFixed(2), phase: "upload" });
 
-  const latTimer = setInterval(async () => {
-    try { onLatency(await pingOnce()); } catch {}
-  }, 1500);
+  const latTimer = setInterval(async () => { try { onLatency(await pingOnce()); } catch {} }, 1500);
 
   return new Promise<number>((resolve) => {
     const xhr = new XMLHttpRequest();
     xhr.open("POST", "/cf-speed/__up");
-
     let lastT = start, lastB = 0;
     const speeds: number[] = [probeMbps];
 
@@ -256,13 +196,8 @@ async function runUpload(
         const mbps = ((e.loaded - lastB) * 8) / ((now - lastT) / 1000) / 1e6;
         speeds.push(mbps);
         onProgress(mbps, e.loaded / e.total);
-        onLivePoint({
-          time: +(timeOffset + (now - start) / 1000 + 0.5).toFixed(1),
-          speed: +mbps.toFixed(2),
-          phase: "upload",
-        });
-        lastT = now;
-        lastB = e.loaded;
+        onLivePoint({ time: +(timeOffset + (now - start) / 1000 + 0.5).toFixed(1), speed: +mbps.toFixed(2), phase: "upload" });
+        lastT = now; lastB = e.loaded;
       }
     };
 
@@ -270,26 +205,18 @@ async function runUpload(
       clearInterval(latTimer);
       if (speeds.length > 3) {
         const stable = speeds.slice(Math.floor(speeds.length * 0.3));
-        const sorted = [...stable].sort((a, b) => a - b);
-        const q1 = sorted[Math.floor(sorted.length * 0.25)];
-        const q3 = sorted[Math.floor(sorted.length * 0.75)];
-        const filtered = stable.filter((v) => v >= q1 && v <= q3 * 1.5);
-        if (filtered.length > 0) { resolve(filtered.reduce((a, b) => a + b, 0) / filtered.length); return; }
+        const s = [...stable].sort((a, b) => a - b);
+        const q1 = s[Math.floor(s.length * 0.25)], q3 = s[Math.floor(s.length * 0.75)];
+        const f = stable.filter((v) => v >= q1 && v <= q3 * 1.5);
+        if (f.length) { resolve(f.reduce((a, b) => a + b, 0) / f.length); return; }
         resolve(stable.reduce((a, b) => a + b, 0) / stable.length);
-      } else {
-        resolve((uploadBytes * 8) / ((performance.now() - start) / 1000) / 1e6);
-      }
+      } else { resolve((uploadBytes * 8) / ((performance.now() - start) / 1000) / 1e6); }
     };
-
-    xhr.onerror = () => {
-      clearInterval(latTimer);
-      resolve((uploadBytes * 8) / ((performance.now() - start) / 1000) / 1e6);
-    };
+    xhr.onerror = () => { clearInterval(latTimer); resolve((uploadBytes * 8) / ((performance.now() - start) / 1000) / 1e6); };
     xhr.send(buffer);
   });
 }
 
-/* ── Hook ──────────────────────────────────────────────────────────── */
 export function useSpeedTest() {
   const [state, setState] = useState<State>(INIT);
   const [history, setHistory] = useState<SpeedResult[]>([]);
@@ -297,7 +224,7 @@ export function useSpeedTest() {
   const [clientInfo, setClientInfo] = useState<ClientInfo | null>(null);
   const runRef = useRef(false);
   const dlEndRef = useRef(0);
-  const latSamplesRef = useRef<number[]>([]);
+  const latRef = useRef<number[]>([]);
 
   const isRunning = state.phase !== "idle" && state.phase !== "done";
   const connectionLabel = useMemo(() => getConnectionLabel(state.downloadMbps), [state.downloadMbps]);
@@ -307,7 +234,7 @@ export function useSpeedTest() {
   const startTest = useCallback(async () => {
     if (runRef.current) return;
     runRef.current = true;
-    latSamplesRef.current = [];
+    latRef.current = [];
     setLiveData([]);
     setState({ ...INIT, phase: "ping" });
     fetchClientInfo().then(setClientInfo);
@@ -319,7 +246,7 @@ export function useSpeedTest() {
       const dlMbps = await runDownload(
         (mbps, f) => setState((s) => ({ ...s, downloadMbps: mbps, progress: f })),
         (p) => { setLiveData((d) => [...d, p]); dlEndRef.current = p.time; },
-        (ms) => latSamplesRef.current.push(ms),
+        (ms) => latRef.current.push(ms),
       );
       setState((s) => ({ ...s, downloadMbps: dlMbps, phase: "upload", progress: 0 }));
 
@@ -327,35 +254,22 @@ export function useSpeedTest() {
         (mbps, f) => setState((s) => ({ ...s, uploadMbps: mbps, progress: f })),
         (p) => setLiveData((d) => [...d, p]),
         dlEndRef.current,
-        (ms) => latSamplesRef.current.push(ms),
+        (ms) => latRef.current.push(ms),
       );
 
       let loadedLat = 0;
-      const sam = latSamplesRef.current;
-      if (sam.length) {
-        const sorted = [...sam].sort((a, b) => a - b);
+      if (latRef.current.length) {
+        const sorted = [...latRef.current].sort((a, b) => a - b);
         loadedLat = sorted[Math.floor(sorted.length / 2)];
       }
 
-      setState({
-        pingMs, jitterMs, downloadMbps: dlMbps, uploadMbps: ulMbps,
-        unloadedLatency: pingMs, loadedLatency: loadedLat, phase: "done", progress: 1,
-      });
-
-      setHistory((h) => [{ id: Date.now(), timestamp: Date.now(), pingMs, jitterMs, downloadMbps: dlMbps, uploadMbps: ulMbps, unloadedLatency: pingMs, loadedLatency: loadedLat }, ...h].slice(0, 25));
+      setState({ pingMs, jitterMs, downloadMbps: dlMbps, uploadMbps: ulMbps, unloadedLatency: pingMs, loadedLatency: loadedLat, phase: "done", progress: 1 });
+      setHistory((h) => [{ id: Date.now(), timestamp: Date.now(), pingMs, jitterMs, downloadMbps: dlMbps, uploadMbps: ulMbps, unloadedLatency: pingMs, loadedLatency: loadedLat }, ...h].slice(0, 50));
     } catch (err) {
       console.error("Speed test error:", err);
       setState((s) => ({ ...s, phase: "done" }));
-    } finally {
-      runRef.current = false;
-    }
+    } finally { runRef.current = false; }
   }, []);
 
-  const resetTest = useCallback(() => {
-    if (runRef.current) return;
-    setState(INIT);
-    setLiveData([]);
-  }, []);
-
-  return { state, isRunning, startTest, resetTest, history, liveData, clientInfo, connectionLabel };
+  return { state, isRunning, startTest, history, liveData, clientInfo, connectionLabel };
 }

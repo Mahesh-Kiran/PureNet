@@ -1,7 +1,8 @@
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap');
+@import url('https://fonts.googleapis.com/icon?family=Material+Icons+Round');
 
 :root {
-  --font: 'Space Grotesk', system-ui, sans-serif;
+  --font: 'DM Sans', system-ui, sans-serif;
   --bg: #eef0f5;
   --surface: rgba(255, 255, 255, 0.65);
   --surface-solid: #ffffff;
@@ -31,9 +32,27 @@ body {
   min-height: 100vh;
   overflow-x: hidden;
 }
+
 #root { min-height: 100vh; }
 
-/* ── Full-page 40/60 split ─────────────────────────────────── */
+.material-icons-round {
+  font-family: 'Material Icons Round';
+  font-weight: normal;
+  font-style: normal;
+  font-size: 20px;
+  display: inline-block;
+  line-height: 1;
+  text-transform: none;
+  letter-spacing: normal;
+  word-wrap: normal;
+  white-space: nowrap;
+  direction: ltr;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: 'liga';
+}
+
 .app-shell {
   display: grid;
   grid-template-columns: 40% 60%;
@@ -45,13 +64,14 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 32px 28px;
+  padding: 60px 28px 32px;
   background: rgba(255, 255, 255, 0.45);
   backdrop-filter: blur(30px);
   -webkit-backdrop-filter: blur(30px);
   border-right: 1px solid rgba(255, 255, 255, 0.4);
   position: relative;
   overflow: hidden;
+  gap: 8px;
 }
 
 .panel-right {
@@ -62,21 +82,24 @@ body {
   gap: 14px;
 }
 
+.header-bar {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 14px;
+  z-index: 10;
+}
+
 @media (max-width: 768px) {
-  .app-shell {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto 1fr;
-  }
-  .panel-left {
-    border-right: none;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.4);
-    padding: 24px 20px;
-    min-height: 380px;
-  }
+  .app-shell { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+  .panel-left { border-right: none; border-bottom: 1px solid rgba(255,255,255,0.4); padding: 56px 20px 24px; min-height: 380px; }
   .panel-right { padding: 16px; }
 }
 
-/* ── Glass card ────────────────────────────────────────────── */
 .glass {
   background: var(--surface);
   backdrop-filter: blur(var(--blur));
@@ -84,12 +107,13 @@ body {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.5);
-  transition: box-shadow 0.2s, transform 0.2s;
+  transition: box-shadow 0.25s ease, transform 0.25s ease;
 }
 .glass:hover {
   box-shadow: var(--shadow-lg), inset 0 1px 0 rgba(255, 255, 255, 0.6);
-  transform: translateY(-1px);
+  transform: translateY(-2px);
 }
+
 .glass-flat {
   background: var(--surface);
   backdrop-filter: blur(var(--blur));
@@ -99,7 +123,6 @@ body {
   box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
-/* ── Chip ──────────────────────────────────────────────────── */
 .chip {
   display: inline-flex;
   align-items: center;
@@ -107,19 +130,19 @@ body {
   padding: 5px 14px;
   border-radius: 999px;
   border: 1px solid var(--border);
-  background: var(--surface);
+  background: rgba(255, 255, 255, 0.5);
   backdrop-filter: blur(12px);
-  font-size: 0.62rem;
+  font-size: 0.6rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   font-weight: 600;
   color: var(--text-2);
+  transition: all 0.3s ease;
 }
 
-/* ── GO Button ─────────────────────────────────────────────── */
 .go-btn {
-  width: 120px;
-  height: 120px;
+  width: 110px;
+  height: 110px;
   border-radius: 50%;
   border: 2px solid rgba(255, 255, 255, 0.5);
   cursor: pointer;
@@ -127,33 +150,29 @@ body {
   align-items: center;
   justify-content: center;
   font-family: var(--font);
-  font-size: 1.5rem;
+  font-size: 1.4rem;
   font-weight: 700;
   letter-spacing: 0.12em;
   color: var(--text);
   background: rgba(255, 255, 255, 0.6);
   backdrop-filter: blur(16px);
   box-shadow: var(--shadow), inset 0 1px 0 rgba(255, 255, 255, 0.6);
-  transition: all 0.2s ease;
+  transition: all 0.25s ease;
+  position: relative;
 }
-.go-btn:hover {
-  border-color: var(--cyan);
-  box-shadow: 0 0 0 3px rgba(14,165,233,0.1), var(--shadow-lg);
-  transform: scale(1.04);
-}
-.go-btn:active { transform: scale(0.96); }
+.go-btn:hover { border-color: var(--cyan); box-shadow: 0 0 0 4px rgba(14,165,233,0.1), var(--shadow-lg); transform: scale(1.06); }
+.go-btn:active { transform: scale(0.94); }
 .go-btn:disabled { cursor: default; border-color: var(--cyan); color: var(--cyan); }
-.go-btn:disabled:hover { transform: none; }
+.go-btn:disabled:hover { transform: none; box-shadow: var(--shadow); }
 
 @media (max-width: 768px) {
-  .go-btn { width: 100px; height: 100px; font-size: 1.2rem; }
+  .go-btn { width: 90px; height: 90px; font-size: 1.1rem; }
 }
 
-/* ── Labels ────────────────────────────────────────────────── */
 .label {
-  font-size: 0.58rem;
+  font-size: 0.6rem;
   font-weight: 600;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--text-3);
 }
@@ -163,6 +182,23 @@ body {
 ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.08); border-radius: 2px; }
 
 @keyframes spin { to { transform: rotate(360deg); } }
+@keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes scaleIn { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: scale(1); } }
+@keyframes slideRight { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+.anim-fade-up { animation: fadeUp 0.4s ease-out both; }
+.anim-fade-in { animation: fadeIn 0.35s ease-out both; }
+.anim-scale-in { animation: scaleIn 0.35s ease-out both; }
+.anim-slide-right { animation: slideRight 0.3s ease-out both; }
+.anim-pulse { animation: pulse 1.5s ease-in-out infinite; }
+
+.delay-1 { animation-delay: 0.05s; }
+.delay-2 { animation-delay: 0.1s; }
+.delay-3 { animation-delay: 0.15s; }
+.delay-4 { animation-delay: 0.2s; }
+.delay-5 { animation-delay: 0.25s; }
 
 @tailwind base;
 @tailwind components;
