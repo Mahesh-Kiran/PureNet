@@ -1,68 +1,123 @@
 # PureNet
 
-Hey there! 👋 Welcome to **PureNet** — an internet bandwidth diagnostic tool that I built to be *both* incredibly accurate and visually stunning. 
+Welcome to PureNet — an internet bandwidth diagnostic tool engineered to be both mathematically precise and visually refined.
 
-When looking at open-source speed tests or trying to build one, I noticed a huge gap: either the apps look terrible but work accurately, or they look beautiful but use fake, hardcoded numbers or highly inaccurate averages. I wanted to create something that feels like an enterprise-grade utility, dressed in a gorgeous, modern glassmorphism UI.
+When analyzing open-source speed tests or trying to build one, I noticed a consistent gap: applications either prioritize accurate measurement at the expense of UI design, or they provide a beautiful interface but rely on inaccurate averages or restricted protocols. I built PureNet to serve as a genuine, enterprise-grade utility wrapped in a modern glassmorphism design system.
 
-## 📸 Architecture
+## System Architecture
 
-I engineered PureNet to actually measure your network directly against Cloudflare's Edge Network. Here's a high-level look at how it runs under the hood:
+I designed PureNet's architecture to measure network capacity directly against Cloudflare's Edge Network, bypassing artificial browser limitations. Here is the high-level data flow and system design:
 
-<div align="center">
-  <img src="./frontend/public/architecture.png" alt="PureNet Architecture Diagram" width="500">
-</div>
+```mermaid
+graph TD
+    %% Styling Definitions
+    classDef client fill:#f8fafc,stroke:#cbd5e1,stroke-width:2px,color:#0f172a,rx:8px,ry:8px
+    classDef express fill:#f0fdf4,stroke:#86efac,stroke-width:2px,color:#0f172a,rx:8px,ry:8px
+    classDef edge fill:#eff6ff,stroke:#93c5fd,stroke-width:2px,color:#0f172a,rx:8px,ry:8px
+    classDef metric fill:#fff1f2,stroke:#fda4af,stroke-width:1px,color:#881337,stroke-dasharray: 5 5
 
-### How it works:
-1. **The Client (Vite + React)**: The dashboard you see on your screen. When you hit "GO", the client starts managing an incredibly intense barrage of parallel HTTP streams. 
-2. **The Express Proxy Backend**: Browsers often block large, cross-origin file downloads strictly for speed tests. To bypass this seamlessly without losing speed, we use a Node.js Express server to proxy our raw blob endpoints.
-3. **Cloudflare Edge**: Because Cloudflare has an endpoint practically in every city on Earth, our server proxies traffic instantly to your closest data center (`speed.cloudflare.com/__down`), ensuring the only bottleneck measured is *your* ISP, not a distant server. 
+    subgraph "Frontend Layer"
+        UI[React Dashboard UI]:::client
+        Engine[Speed Test Runtime Engine]:::client
+        UI <-->|State Updates & Metrics| Engine
+    end
 
-## 🚀 The Math: Why it's accurate
-Most simple React speed tests calculate speed like this: `(Total bytes downloaded) / (Total time)`. 
-**That mathematically ruins your results.** 
-Why? Because TCP connections have a "slow start" phase where they gradually ramp up to avoid network congestion. Counting that slow ramp-up phase drastically pulls down your average.
+    subgraph "Backend Proxy Layer"
+        Proxy[Express Proxy Server]:::express
+    end
 
-PureNet does what the big players do:
-- It tracks the data rolling in over **250 millisecond windows**.
-- It tosses out the first 30% of the timeline to ignore the "slow start".
-- It calculates the **90th Percentile** of your sustained download speed.
-- It automatically shifts from 2 parallel streams up to **8 parallel streams** depending on how fast your initial probe is, ensuring we actually saturate gigabit connections.
+    subgraph "Global Infrastructure"
+        CF[Cloudflare Edge Network]:::edge
+        CDN[CDN Trace / Speed Endpoints]:::edge
+        CF --- CDN
+    end
 
-## 🛠 Features
+    %% Flow connections
+    Engine <-->|XHR / Fetch Streams| Proxy
+    Proxy <-->|Proxied HTTP traffic| CF
 
-- **Blazing Fast Accuracy**: Matches real-world results against industry giants.
-- **Glassmorphism UI**: A buttery smooth 40/60 dashboard layout with pulse animations and React portals for flawless hover tooltips.
-- **Smart Capability Engine**: Don't know what "34 Mbps" means? PureNet tells you via dynamic chips ("4K Ready") and a dedicated **Education Readiness** panel that checks if you can stream lectures or handle proctored exams without dropping.
-- **Latency Diagnostics**: Shows loaded vs. unloaded latency (your jitter and bufferbloat metrics).
+    %% Notes
+    note1[TCP Saturation / 8 Streams]:::metric
+    Engine -.-> note1
+```
 
-## 💻 Running it locally
+### How it operates:
+1. **The Client Runtime (Vite + React)**: The dashboard manages the visual state. Upon initiation, the client's internal engine launches an intense barrage of concurrent HTTP streams. 
+2. **The Express Proxy Backend**: Browsers often restrict large cross-origin payload downloads if they aren't explicitly configured. To bypass this seamlessly without artificial throttling, we use a lightweight Node.js Express server to proxy the byte-stream endpoints.
+3. **Cloudflare Global Edge**: Because Cloudflare maintains an endpoint close to nearly every major ISP, our backend proxies traffic instantly to your closest operational data center (`speed.cloudflare.com/__down`). This ensures the only bottleneck being measured is your ISP infrastructure, not a distant server routing hop.
 
-PureNet is built as a monorepo workspace.
+## The Mathematics of Measurement
 
-1. Ensure you have Node.js 20+ installed.
-2. Install the dependencies:
+Most simplistic browser-based speed tests compute bandwidth across the entire continuous timeline: `(Total bytes downloaded) / (Total time)`. 
+**This formula systematically corrupts runtime results.** 
+Due to standard TCP congestion control logic, connections have a "slow start" phase where they gradually scale their sliding window to avoid packet loss. Absorbing that initial ramp-up drastically suppresses the final average.
+
+PureNet employs the methodologies used by industrial diagnostic tools:
+- It records instantaneous bandwidth throughput over rapid **250-millisecond intervals**.
+- It intentionally discards the first 30% of the timeline to eliminate the TCP slow-start anomaly.
+- It calculates the **90th Percentile** of your sustained operational speed.
+- It dynamically provisions parallel connection streams (scaling from 2 up to 8 continuous streams) based on an initial probe, guaranteeing the test can saturate gigabit and multi-gigabit connections.
+
+## Features & Competitive Comparison
+
+The internet bandwidth measurement market is dominated by a few massive commercial entities. PureNet was built from the ground up to solve the distinct shortcomings observed in those platforms:
+
+| Feature | PureNet | Fast.com | Speedtest.net | Typical React Projects |
+|---------|---------|----------|---------------|------------------------|
+| **Transparency** | Entire mathematical calculation open-sourced. | Fully proprietary, black-box equations. | Proprietary algorithms with heavy ad-tracking. | Uses crude mathematical averages; highly inaccurate. |
+| **Data Source Limit** | Tests against Cloudflare's massive global Edge Network. | Restricted exclusively to Netflix servers. | Highly variable third-party volunteer servers. | Usually pings small personal backend routers. |
+| **TCP Slow Start Check** | Discards initial 30% of TCP anomalies for true peak math. | Unknown (Internal tracking). | Unknown (Internal tracking). | Calculates overall average (fails on fast links). |
+| **Contextual Analysis** | Translates raw digits into Real-World "Education Readiness". | Raw numbers only. | Raw numbers only. | Raw numbers only. |
+| **UX Ecosystem** | Modern glassmorphism system with zero advertising. | Minimalist but rigid. | Ad-heavy, visually cluttered, distracting. | Usually relies on basic HTML templates. |
+
+### Core System Features
+
+- **Blazing Fast Diagnostic Accuracy**: Implements 90th percentile arithmetic and 250-millisecond observation windows to capture peak sustainable bandwidth, bypassing TCP slow start penalties.
+- **Glassmorphism Interface**: A flexible 40/60 dashboard layout built heavily on composite CSS properties containing reactive hover states, yielding an intrinsically premium feel without being noisy.
+- **Contextual Education Engine**: Translates raw megabit values into actionable assessments via a dedicated Education Readiness evaluation (e.g., verifying capability for live proctored exams vs. lightweight streaming).
+- **Comprehensive Latency Profiling**: Captures both intrinsic unloaded ping (raw physical distance) and loaded bufferbloat measurements (router stress capabilities).
+
+## Installation & Deployment
+
+You can download and deploy the PureNet application locally on your machine or utilize our heavily optimized Docker container.
+
+### Option A: Local Development (Node.js)
+
+PureNet is constructed as an NPM workspace monorepo, requiring Node.js environments.
+
+1. **Clone or Download the Repository:**
+   ```bash
+   git clone https://github.com/Mahesh-Kiran/PureNet.git
+   cd PureNet
+   ```
+2. **Install the necessary dependencies:**
    ```bash
    npm install
    ```
-3. Run the development server for both frontend and backend concurrently:
+3. **Initialize the development servers:**
+   Run the command below in the core repository directory. This simultaneously starts the frontend client and the backend proxy concurrently using `concurrently`.
    ```bash
    npm run dev
    ```
-4. The frontend will boot up on `localhost:5173` and the backend will start on `localhost:4000`. 
+4. **Access the application:**
+   - The Vite Client is available at: `http://localhost:5173`
+   - The API Proxy Server is available at: `http://localhost:4000`
 
-## 🐳 Docker Production Deployment
+### Option B: Production Orchestration (Docker)
 
-I've included a heavily optimized, multi-stage `Dockerfile`. It builds the React app, compiles the TypeScript server, and serves them both from a unified, lightweight Alpine Node runtime.
+I have authored a multi-stage `Dockerfile` configured strictly for production overhead reduction. It compiles the React application via Vite, transpiles the TypeScript server, and serves the unified bundle from a lightweight Alpine Node runtime environment without carrying over compilation dependencies. 
 
-Build the container:
-```bash
-docker build -t purenet .
-```
-Run it:
-```bash
-docker run -p 3000:3000 purenet
-```
-Then visit `http://localhost:3000`.
+1. **Verify you have Docker installed and running.**
+2. **Build the orchestrator image directly from the fundamental layer:**
+   ```bash
+   docker build -t purenet:latest .
+   ```
+3. **Execute and expose the runtime container:**
+   ```bash
+   docker run -d -p 3000:3000 --name purenet-server purenet:latest
+   ```
+4. **Access the unified production build:**
+   Navigate your browser to `http://localhost:3000`.
 
 ---
-*Built with ❤️ utilizing React, raw Mathematics, and the Cloudflare Edge network.*
+*Developed by Mahesh Kiran utilizing React, operational analytics, and Cloudflare Edge.*
