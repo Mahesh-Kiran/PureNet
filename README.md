@@ -86,38 +86,6 @@ PureNet is built as an NPM Workspace Monorepo:
 - `/backend`: The Node + Express proxy server, essential for bypassing strict browser CORS limitations on large data streams.
 - `Dockerfile`: A unified multi-stage build that compiles the frontend, transpiles the backend, and serves both via a single Node container.
 
-## How It Works
-
-Here is a look at the system architecture and the data flow behind every speed test:
-
-```mermaid
-graph TD
-    classDef client fill:#f8fafc,stroke:#cbd5e1,stroke-width:2px,color:#0f172a,rx:8px,ry:8px
-    classDef express fill:#f0fdf4,stroke:#86efac,stroke-width:2px,color:#0f172a,rx:8px,ry:8px
-    classDef edge fill:#eff6ff,stroke:#93c5fd,stroke-width:2px,color:#0f172a,rx:8px,ry:8px
-    classDef metric fill:#fff1f2,stroke:#fda4af,stroke-width:1px,color:#881337,stroke-dasharray: 5 5
-
-    subgraph "Frontend Layer"
-        UI[React Dashboard UI]:::client
-        Engine[Speed Test Runtime Engine]:::client
-        UI <-->|State Updates & Metrics| Engine
-    end
-
-    subgraph "Backend Proxy Layer"
-        Proxy[Express Proxy Server]:::express
-    end
-
-    subgraph "Global Infrastructure"
-        CF[Cloudflare Edge Network]:::edge
-    end
-
-    Engine <-->|XHR / Fetch Streams| Proxy
-    Proxy <-->|Proxied HTTP traffic| CF
-    Engine -.->|Interval Calculations / 90th Percentile| note1[Math Engine]:::metric
-```
-
-To conquer the unreliability of browser speed tests, the **Speed Test Runtime Engine** fetches a tiny probe file. Based on that probe, it opens multiple massive byte-streams with Cloudflare's servers (proxied through our Express backend to avoid CORS blocking). It records data transfer rates every 250ms, strips away the chaotic "slow-start" ramp-up segment, and computes the absolute peak bandwidth that your network maintained consistently.
-
 ## Metrics Explained
 
 - **Download**: The rate your network can pull data from the global internet. Crucial for streaming content, pulling large repositories, or downloading game updates.
