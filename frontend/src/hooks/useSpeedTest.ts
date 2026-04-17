@@ -180,7 +180,7 @@ async function runUpload(
 ): Promise<number> {
   const probeBuf = new Uint8Array(1024 * 1024);
   const pt0 = performance.now();
-  await fetch("https://speed.cloudflare.com/__up", { method: "POST", body: probeBuf });
+  await fetch("/cf-speed/__up", { method: "POST", body: probeBuf });
   const probeMbps = (probeBuf.length * 8) / ((performance.now() - pt0) / 1000) / 1e6;
 
   let uploadBytes: number;
@@ -200,7 +200,7 @@ async function runUpload(
 
   return new Promise<number>((resolve) => {
     const xhr = new XMLHttpRequest();
-    xhr.open("POST", "https://speed.cloudflare.com/__up");
+    xhr.open("POST", "/cf-speed/__up");
     let lastT = start, lastB = 0;
     const speeds: number[] = [];
 

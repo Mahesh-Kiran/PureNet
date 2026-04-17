@@ -39,12 +39,18 @@ router.get("/download", (req: Request, res: Response) => {
   write();
 });
 
-const rawBody = express.raw({ limit: "110mb", type: "*/*" });
+// 🛡️ Payload size capped to 50mb to prevent memory exhaustion attacks
+const rawBody = express.raw({ limit: "50mb", type: "*/*" });
 
 router.post(
   "/upload",
   (req: Request, res: Response, next: NextFunction) => rawBody(req, res, next),
   (req: Request, res: Response) => {
+    // 🔒 CYBER-SECURITY PROTOCOL: ZERO DISK WRITE
+    // This endpoint explicitly does NOT save or execute uploaded files.
+    // Hackers attempting to upload malware/viruses here will fail because the incoming bytes
+    // are kept in ephemeral memory strictly for size calculation, and are instantly discarded.
+    // Without writing to disk, malware payloads vanish effortlessly into the void.
     res.json({ receivedBytes: Buffer.isBuffer(req.body) ? req.body.length : 0, ts: Date.now() });
   }
 );
